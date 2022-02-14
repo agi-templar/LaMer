@@ -1,6 +1,6 @@
 from LaMer import data
 
-__version__ = "0.0.2"
+__version__ = "0.0.1"
 
 __all__ = [
     "data",
