@@ -26,4 +26,4 @@ jobs:
         isort --check .
     - name: Type check
       run: |
-        mypy
+        mypy -p LaMer --no-incremental
