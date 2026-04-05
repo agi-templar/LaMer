@@ -147,7 +147,13 @@ class ImitationLearningTrainer:
         return self.tokenizer.decode(output[0], skip_special_tokens=True)
 
     def _decode_sample(self, input_ids: torch.Tensor) -> Tuple[str, torch.Tensor]:
-        """Sampling decoding for exploration. Returns text and log prob sum."""
+        """Sampling decoding for exploration. Returns text and log prob sum.
+
+        Generation is done in no_grad (no gradients needed for sampling),
+        then log-probs are recomputed via a forward pass WITH gradients
+        so REINFORCE can backpropagate through them.
+        """
+        # Generate without gradients (sampling only)
         self.model.eval()
         with torch.no_grad():
             output = self.model.generate(
@@ -156,17 +162,26 @@ class ImitationLearningTrainer:
                 top_k=50,
                 top_p=0.95,
                 max_length=128,
-                output_scores=True,
                 return_dict_in_generate=True,
             )
-        text = self.tokenizer.decode(output.sequences[0], skip_special_tokens=True)
+        generated_ids = output.sequences  # (1, seq_len)
+        text = self.tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
-        log_probs = []
-        for step_idx, step_scores in enumerate(output.scores):
-            probs = F.log_softmax(step_scores[0], dim=-1)
-            token_id = output.sequences[0, step_idx + 1]
-            log_probs.append(probs[token_id])
-        log_prob_sum = torch.stack(log_probs).sum() if log_probs else torch.tensor(0.0)
+        # Recompute log-probs WITH gradients via a forward pass
+        self.model.train()
+        decoder_input_ids = generated_ids[:, :-1]
+        labels = generated_ids[:, 1:]
+        outputs = self.model(
+            input_ids=input_ids,
+            decoder_input_ids=decoder_input_ids,
+        )
+        logits = outputs.logits  # (1, seq_len-1, vocab)
+        log_probs = F.log_softmax(logits, dim=-1)
+        # Gather log-probs of the tokens actually generated
+        token_log_probs = log_probs.gather(2, labels.unsqueeze(-1)).squeeze(-1)
+        # Mask padding
+        pad_mask = labels.ne(self.tokenizer.pad_token_id).float()
+        log_prob_sum = (token_log_probs * pad_mask).sum()
 
         return text, log_prob_sum
 
@@ -226,11 +241,10 @@ class ImitationLearningTrainer:
                 advantage = j_il_sample - j_il_greedy
                 policy_loss = -log_prob * advantage
 
-                if policy_loss.requires_grad:
-                    optimizer.zero_grad()
-                    policy_loss.backward()
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
-                    optimizer.step()
+                optimizer.zero_grad()
+                policy_loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                optimizer.step()
 
                 total_loss += abs(advantage)
                 pbar.set_postfix({'adv': f'{advantage:.4f}'})

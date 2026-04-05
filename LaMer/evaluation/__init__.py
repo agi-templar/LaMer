@@ -7,7 +7,7 @@ from LaMer.evaluation.metrics import (
     compute_gm,
     compute_i_pinc,
     compute_sim,
-    run_full_eval,
+    run_full,
 )
 
 __all__ = [
@@ -17,5 +17,5 @@ __all__ = [
     "compute_fluency",
     "compute_i_pinc",
     "compute_gm",
-    "run_full_eval",
+    "run_full",
 ]
