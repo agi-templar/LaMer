@@ -1,0 +1,9 @@
+[flake8]
+exclude =
+    .git,
+    __pycache__,
+    build,
+    dist,
+    *.egg-info
+max-line-length = 87
+ignore = B305,W504,B006,B008

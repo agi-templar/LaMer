@@ -2,7 +2,6 @@
 # coding=utf-8
 
 # Licensed under the Apache License, Version 2.0
-
 """TST metrics: ACC, BLEU, SIM, FL, i-PINC, GM (Section 3.2).
 
 Usage:
@@ -43,6 +42,7 @@ def compute_bleu(
     :param max_n: max n-gram order
     :return: average BLEU score
     """
+
     def sentence_bleu_n(output_tokens, ref_token_lists, n):
         output_ng = _ngrams(output_tokens, n)
         max_ref_ng = Counter()
@@ -50,10 +50,7 @@ def compute_bleu(
             ref_ng = _ngrams(ref_tokens, n)
             for ng in ref_ng:
                 max_ref_ng[ng] = max(max_ref_ng[ng], ref_ng[ng])
-        clipped = sum(
-            min(count, max_ref_ng[ng])
-            for ng, count in output_ng.items()
-        )
+        clipped = sum(min(count, max_ref_ng[ng]) for ng, count in output_ng.items())
         total = sum(output_ng.values())
         return clipped / max(total, 1)
 
@@ -65,9 +62,7 @@ def compute_bleu(
 
         for n in range(1, max_n + 1):
             if len(out_tokens) >= n:
-                scores_per_n[n].append(
-                    sentence_bleu_n(out_tokens, ref_token_lists, n)
-                )
+                scores_per_n[n].append(sentence_bleu_n(out_tokens, ref_token_lists, n))
             else:
                 scores_per_n[n].append(0.0)
 
@@ -138,8 +133,10 @@ def compute_accuracy(
     :return: accuracy (fraction of outputs classified as target style)
     """
     if classifier_path is None:
-        print("WARNING: No classifier provided. Train a TextCNN/BERT "
-              "classifier on your task data for ACC computation.")
+        print(
+            "WARNING: No classifier provided. Train a TextCNN/BERT "
+            "classifier on your task data for ACC computation."
+        )
         return 0.0
 
     from transformers import pipeline
@@ -234,7 +231,9 @@ if __name__ == '__main__':
             references = [[line.strip()] for line in f]
 
     results = run_full(
-        sources, outputs, references,
+        sources,
+        outputs,
+        references,
         target_label=args.target_label,
         classifier_path=args.classifier_path,
     )

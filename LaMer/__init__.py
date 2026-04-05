@@ -1,4 +1,4 @@
-from LaMer import data, model, evaluation
+from LaMer import data, evaluation, model
 
 __version__ = "0.1.0"
 

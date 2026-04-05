@@ -2,7 +2,6 @@
 # coding=utf-8
 
 # Licensed under the Apache License, Version 2.0
-
 """Reinforced Imitation Learning by Contrast (Section 2.4).
 
 After MLE pre-training, we refine the BART model using REINFORCE with a
@@ -55,9 +54,7 @@ def hamming_distance(v1: np.ndarray, v2: np.ndarray) -> int:
     return int(np.sum(v1 != v2))
 
 
-def entity_to_onehot(
-    entities: List[str], vocab: List[str]
-) -> np.ndarray:
+def entity_to_onehot(entities: List[str], vocab: List[str]) -> np.ndarray:
     """Convert entity list to one-hot vector over vocab."""
     vec = np.zeros(len(vocab), dtype=int)
     for e in entities:
@@ -102,14 +99,12 @@ class ImitationLearningTrainer:
         Negative cosine similarity between sentence embeddings.
         """
         embs = self.sem_encoder.encode([generated, demonstration])
-        cos_sim = np.dot(embs[0], embs[1]) / (
-            np.linalg.norm(embs[0]) * np.linalg.norm(embs[1]) + 1e-8
-        )
+        cos_sim = np.dot(
+            embs[0], embs[1]
+        ) / (np.linalg.norm(embs[0]) * np.linalg.norm(embs[1]) + 1e-8)
         return -cos_sim
 
-    def compute_d_psv(
-        self, source: str, generated: str, demonstration: str
-    ) -> float:
+    def compute_d_psv(self, source: str, generated: str, demonstration: str) -> float:
         """Token-level scene preservation distance (d_PSV).
 
         d_PSV = alpha * d_Order + (1 - alpha) * d_Exist
@@ -132,17 +127,13 @@ class ImitationLearningTrainer:
 
         # d_Exist: Hamming on union one-hot vectors
         gen_union = entity_to_onehot(list(set(gen_ents) | set(src_ents)), all_ents)
-        demo_union = entity_to_onehot(
-            list(set(demo_ents) | set(src_ents)), all_ents
-        )
+        demo_union = entity_to_onehot(list(set(demo_ents) | set(src_ents)), all_ents)
         d_exist = hamming_distance(gen_union, demo_union)
         d_exist_norm = d_exist / max(len(all_ents), 1)
 
         return self.alpha * d_order_norm + (1 - self.alpha) * d_exist_norm
 
-    def compute_psi(
-        self, source: str, generated: str, demonstration: str
-    ) -> float:
+    def compute_psi(self, source: str, generated: str, demonstration: str) -> float:
         """Combined distance psi*(.) = d_SEM + d_PSV."""
         d_sem = self.compute_d_sem(generated, demonstration)
         d_psv = self.compute_d_psv(source, generated, demonstration)

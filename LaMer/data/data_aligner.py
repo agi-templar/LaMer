@@ -19,7 +19,6 @@
 import os
 import pickle
 import random
-from abc import ABC
 from functools import partial
 from multiprocessing import Pool, cpu_count
 from typing import Any, List, Union
@@ -36,7 +35,7 @@ from LaMer.data.utils import get_sents_from_file, iterate_batches_lm, normalize
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
-class DataAligner(ABC):
+class DataAligner:
 
     def __init__(
         self,
@@ -45,7 +44,7 @@ class DataAligner(ABC):
         use_cache: bool = True,
         num_samples: int = -1
     ):
-        super(DataAligner, self).__init__()
+        super().__init__()
         assert align_method in ['random', 'lm', 'lm_kg']
 
         self.config = config
@@ -72,8 +71,8 @@ class DataAligner(ABC):
             # the LM we use to mine paraphrases
             self.lm_model = SentenceTransformer('all-MiniLM-L6-v2')
 
-            src_cache_name, tgt_cache_name = 'cached_emb_src_sents.pickle',\
-                                             'cached_emb_tgt_sents.pickle'
+            src_cache_name = 'cached_emb_src_sents.pickle'
+            tgt_cache_name = 'cached_emb_tgt_sents.pickle'
             if use_cache:
                 if os.path.exists(
                     os.path.join(self.config.cache_path, src_cache_name)
@@ -172,9 +171,8 @@ class DataAligner(ABC):
         return sents_list
 
     @staticmethod
-    def _get_random(src_sents: str, tgt_sents: List[str],
-                    n: int) -> List[dict]:
-        """Single process version of getting a random mapped tgt sentences for src sentences
+    def _get_random(src_sents: str, tgt_sents: List[str], n: int) -> List[dict]:
+        """Get random mapped tgt sentences for a src sentence.
 
         :param src_sents:
         :param tgt_sents:
@@ -293,10 +291,7 @@ class DataAligner(ABC):
         )
 
         _part_compute_emb_toppk = partial(
-            self._compute_lm_toppk,
-            tgt_emb=self.tgt_emb,
-            topp=topp,
-            topk=topk
+            self._compute_lm_toppk, tgt_emb=self.tgt_emb, topp=topp, topk=topk
         )
 
         print("Now working on top p and top k picking ...")
@@ -371,12 +366,14 @@ class DataAligner(ABC):
                 sas = compute_sas(src_entities, tgt_entities, tgt_len, beta)
 
                 if sas >= topp:
-                    all_rows.append({
-                        'source': src_sent,
-                        'target': tgt_sent,
-                        'similarity_score': sim_sc,
-                        'sas_score': sas
-                    })
+                    all_rows.append(
+                        {
+                            'source': src_sent,
+                            'target': tgt_sent,
+                            'similarity_score': sim_sc,
+                            'sas_score': sas
+                        }
+                    )
 
         out_df = pd.DataFrame(all_rows)
 

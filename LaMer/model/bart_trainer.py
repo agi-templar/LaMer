@@ -2,7 +2,6 @@
 # coding=utf-8
 
 # Licensed under the Apache License, Version 2.0
-
 """Conditional Token-level MLE Training on BART (Section 2.3).
 
 The model takes source-style sentences as input and is trained to generate
@@ -201,10 +200,7 @@ class BartStyleTransfer:
         with torch.no_grad():
             for sent in sentences:
                 inputs = self.tokenizer(
-                    sent,
-                    return_tensors='pt',
-                    max_length=max_length,
-                    truncation=True
+                    sent, return_tensors='pt', max_length=max_length, truncation=True
                 ).to(self.device)
                 output_ids = self.model.generate(
                     **inputs,

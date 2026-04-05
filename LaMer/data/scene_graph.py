@@ -4,7 +4,6 @@
 # Author: Ruibo Liu (ruibo.liu.gr@dartmouth.edu)
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
-
 """Scene graph extraction and Scene Alignment Score (SAS) computation.
 
 Uses SceneGraphParser (https://github.com/vacancy/SceneGraphParser) to extract
@@ -15,9 +14,7 @@ Reference: Section 2.2 of the paper (Equation 1).
 """
 
 import warnings
-from typing import Dict, List, Optional, Set, Tuple
-
-import numpy as np
+from typing import List
 
 try:
     import sng_parser
@@ -27,7 +24,8 @@ except ImportError:
     warnings.warn(
         "sng_parser not installed. Install via: "
         "pip install SceneGraphParser. "
-        "LM+KG alignment will not be available."
+        "LM+KG alignment will not be available.",
+        stacklevel=2
     )
 
 
@@ -95,7 +93,7 @@ def compute_sas(
     if precision + recall == 0:
         return 0.0
 
-    beta_sq = beta ** 2
+    beta_sq = beta**2
     f_beta = ((1 + beta_sq) * precision * recall) / (beta_sq * precision + recall)
     sas = f_beta / tgt_sent_len
 
