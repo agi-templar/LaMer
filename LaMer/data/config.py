@@ -155,24 +155,26 @@ Config = {
     'formal_family_i2f':
     SimpleNamespace(
         **{
-            'formal_file_name': "data/GYAFC_Corpus/Entertainment_Music/train/informal",
-            'informal_file_name': "data/GYAFC_Corpus/Entertainment_Music/train/formal",
-            'cache_path': './data/formal_music/i2f_cached/',
-            't2t_cache_path': "./data/formal_music/t2t/i2f/",
-            'rl_cache_path': "./data/formal_music/rl/i2f/",
+            'formal_file_name':
+            "data/GYAFC_Corpus/Family_Relationships/train/informal",
+            'informal_file_name':
+            "data/GYAFC_Corpus/Family_Relationships/train/formal",
+            'cache_path': './data/formal_family/i2f_cached/',
+            't2t_cache_path': "./data/formal_family/t2t/i2f/",
+            'rl_cache_path': "./data/formal_family/rl/i2f/",
             'random_topk': 3,
-            'random_cache_file': 'formal_music_i2f_random.csv',
-            'random_root_name': 'formal_music_random',
+            'random_cache_file': 'formal_family_i2f_random.csv',
+            'random_root_name': 'formal_family_random',
             'lm_topk': 3,
             'lm_topp': 0.03,
             'lm_batch_size': 10000,
-            'lm_cache_file': 'formal_music_i2f_lm_top3_top003.csv',
-            'lm_root_name': 'formal_music_i2f_top3_top003',
+            'lm_cache_file': 'formal_family_i2f_lm_top3_top003.csv',
+            'lm_root_name': 'formal_family_i2f_top3_top003',
             'lm_kg_topk': 110,
             'lm_kg_topp': 0.015,
             'lm_kg_batch_size': 4000,
-            'lm_kg_cache_file': "formal_music_i2f_lm_kg_tok110_top0015.csv",
-            'lm_kg_root_name': 'formal_music_i2f_lm_kg_tok110_top0015',
+            'lm_kg_cache_file': "formal_family_i2f_lm_kg_tok110_top0015.csv",
+            'lm_kg_root_name': 'formal_family_i2f_lm_kg_tok110_top0015',
         }
     ),
     'allsides_l2r':

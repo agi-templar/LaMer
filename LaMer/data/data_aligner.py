@@ -30,6 +30,7 @@ import torch
 from sentence_transformers import SentenceTransformer, util
 from tqdm import tqdm
 
+from LaMer.data.scene_graph import batch_extract_entities, compute_sas
 from LaMer.data.utils import get_sents_from_file, iterate_batches_lm, normalize
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -50,8 +51,17 @@ class DataAligner(ABC):
         self.config = config
         self.align_method = align_method
 
-        self.src_data = self._preprocess(self.config.pos_file_name)
-        self.tgt_data = self._preprocess(self.config.neg_file_name)
+        # Support different config field names across tasks
+        src_field = next(
+            f for f in ['pos_file_name', 'formal_file_name', 'left_file_name']
+            if hasattr(self.config, f)
+        )
+        tgt_field = next(
+            f for f in ['neg_file_name', 'informal_file_name', 'right_file_name']
+            if hasattr(self.config, f)
+        )
+        self.src_data = self._preprocess(getattr(self.config, src_field))
+        self.tgt_data = self._preprocess(getattr(self.config, tgt_field))
 
         if num_samples != -1:
             num_samples = min(num_samples, min(len(self.src_data), len(self.tgt_data)))
@@ -162,8 +172,8 @@ class DataAligner(ABC):
         return sents_list
 
     @staticmethod
-    def _get_random(src_sents: List[str], tgt_sents: List[str],
-                    n: int) -> dict[str, Union[list[str], Any]]:
+    def _get_random(src_sents: str, tgt_sents: List[str],
+                    n: int) -> List[dict]:
         """Single process version of getting a random mapped tgt sentences for src sentences
 
         :param src_sents:
@@ -171,12 +181,10 @@ class DataAligner(ABC):
         :param n:
         :return:
         """
-        temp_dict, _tgt_sents = {}, []
-        temp_dict['source'] = src_sents
-        for i in [random.randint(0, len(tgt_sents) - 1) for _ in range(n)]:
-            _tgt_sents.append(tgt_sents[i])
-        temp_dict['target'] = _tgt_sents
-        return temp_dict
+        rows = []
+        for tgt_idx in [random.randint(0, len(tgt_sents) - 1) for _ in range(n)]:
+            rows.append({'source': src_sents, 'target': tgt_sents[tgt_idx]})
+        return rows
 
     @staticmethod
     def _compute_lm_toppk(
@@ -245,18 +253,18 @@ class DataAligner(ABC):
         if not os.path.exists(self.config.cache_path):
             os.makedirs(self.config.cache_path)
 
-        out_df = pd.DataFrame(columns=['source', 'target'])
         _part_get_random = partial(self._get_random, n=topk)
         args = [(src_sent, self.tgt_data) for src_sent in self.src_data]
 
         with Pool(cpu_count()) as proc:
-            _temp_dicts = list(
+            _temp_rows_list = list(
                 tqdm(proc.starmap(
                     _part_get_random,
                     args,
                 ), total=len(self.src_data))
             )
-            out_df = out_df.append(pd.DataFrame(_temp_dicts), ignore_index=True)
+            all_rows = [row for rows in _temp_rows_list for row in rows]
+            out_df = pd.DataFrame(all_rows, columns=['source', 'target'])
 
         if not os.path.exists(output_root_dir):
             os.makedirs(output_root_dir)
@@ -279,14 +287,13 @@ class DataAligner(ABC):
             self.tgt_data
         ) != 0, "The src/tgt sentences are None!"
 
-        out_df = pd.DataFrame(columns=['source', 'target', 'similarity_score'])
+        all_dicts = []
         batch_size = min(
             self.config.lm_batch_size, min(len(self.src_data), len(self.tgt_data))
         )
 
         _part_compute_emb_toppk = partial(
             self._compute_lm_toppk,
-            # TODO?
             tgt_emb=self.tgt_emb,
             topp=topp,
             topk=topk
@@ -299,10 +306,83 @@ class DataAligner(ABC):
         ):
             src_sents, src_embs = batched_src_sents
             _temp_dicts = _part_compute_emb_toppk(src_sents, src_embs, self.tgt_data)
-            out_df = out_df.append(pd.DataFrame(_temp_dicts), ignore_index=True)
+            all_dicts.extend(_temp_dicts)
+
+        out_df = pd.DataFrame(all_dicts)
 
         if not os.path.exists(output_root_dir):
             os.makedirs(output_root_dir)
 
         out_df.to_csv(os.path.join(output_root_dir, output_file_name), index=False)
+        return out_df
+
+    def align_by_LM_KG(
+        self, output_root_dir: str, output_file_name: str
+    ) -> pd.DataFrame:
+        """Align sentences by LM embeddings + Scene Alignment Score (SAS).
+
+        Steps (per paper Section 2.2):
+        1. Use LM embeddings to pick top-k candidate targets per source.
+        2. Extract scene entities from source and each candidate target.
+        3. Compute SAS for each pair; keep those above threshold p.
+
+        :param output_root_dir: the folder that stores the output csv
+        :param output_file_name: the file name of the output csv
+        :return: a pandas.DataFrame with aligned sentences
+        """
+        assert self.align_method == 'lm_kg', \
+            "align_by_LM_KG requires align_method='lm_kg'"
+
+        topk = self.config.lm_kg_topk
+        topp = self.config.lm_kg_topp
+        batch_size = self.config.lm_kg_batch_size
+        beta = getattr(self.config, 'beta', 0.01)
+
+        print("Step 1: LM-based top-k candidate selection ...")
+        lm_candidates = []
+        _part_compute = partial(
+            self._compute_lm_toppk,
+            tgt_emb=self.tgt_emb,
+            topp=0.0,  # no p-filtering at this stage
+            topk=topk
+        )
+        for batched in tqdm(
+            iterate_batches_lm(self.src_data, self.src_emb, batch_size),
+            total=len(self.src_data) // batch_size
+        ):
+            src_sents, src_embs = batched
+            _temp = _part_compute(src_sents, src_embs, self.tgt_data)
+            lm_candidates.extend(_temp)
+
+        print("Step 2: Scene graph extraction and SAS filtering ...")
+        all_rows = []
+        for item in tqdm(lm_candidates):
+            src_sent = item['source']
+            tgt_sents = item['target']
+            sim_scores = item['similarity_score']
+
+            src_entities = batch_extract_entities([src_sent])[0]
+            if not src_entities:
+                continue
+
+            for tgt_sent, sim_sc in zip(tgt_sents, sim_scores):
+                tgt_entities = batch_extract_entities([tgt_sent])[0]
+                tgt_len = len(tgt_sent.split())
+                sas = compute_sas(src_entities, tgt_entities, tgt_len, beta)
+
+                if sas >= topp:
+                    all_rows.append({
+                        'source': src_sent,
+                        'target': tgt_sent,
+                        'similarity_score': sim_sc,
+                        'sas_score': sas
+                    })
+
+        out_df = pd.DataFrame(all_rows)
+
+        if not os.path.exists(output_root_dir):
+            os.makedirs(output_root_dir)
+
+        out_df.to_csv(os.path.join(output_root_dir, output_file_name), index=False)
+        print(f"LM+KG alignment done. {len(out_df)} pairs saved.")
         return out_df

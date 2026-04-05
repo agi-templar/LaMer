@@ -47,10 +47,11 @@ setup(
         "numpy>1.16.0",
         "pandas",
         "scikit-learn",
-        "transformers",
-        "torch>=1.4.0",
+        "transformers>=4.20.0",
+        "torch>=1.9.0",
         "sentence_transformers",
         "spacy",
+        "SceneGraphParser",
     ],
     extras_require={
         "dev": [
