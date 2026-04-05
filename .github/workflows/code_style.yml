@@ -13,15 +13,16 @@ jobs:
         enable-cache: true
     - name: Set up Python 3.10
       run: uv python install 3.10
-    - name: Install linting dependencies
-      run: uv pip install --system flake8 flake8-bugbear yapf isort mypy
-    - name: Install package (no heavy deps)
-      run: uv pip install --system --no-deps -e .
+    - name: Install dependencies
+      run: |
+        uv venv
+        uv pip install flake8 flake8-bugbear yapf isort mypy
+        uv pip install --no-deps -e .
     - name: Lint with flake8
-      run: flake8 LaMer/ test/ --count --show-source --statistics
+      run: uv run flake8 LaMer/ test/ --count --show-source --statistics
     - name: Check code formatting
       run: |
-        yapf -r -d LaMer/ test/
-        isort --check LaMer/ test/
+        uv run yapf -r -d LaMer/ test/
+        uv run isort --check LaMer/ test/
     - name: Type check
-      run: mypy -p LaMer --no-incremental
+      run: uv run mypy -p LaMer --no-incremental
