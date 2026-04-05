@@ -4,165 +4,184 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2204.08123-b31b1b.svg)](https://arxiv.org/abs/2204.08123)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Official implementation of **"Non-Parallel Text Style Transfer with Self-Parallel Supervision"** (ICLR 2022).
+Implementation of **"Non-Parallel Text Style Transfer with Self-Parallel Supervision"** (ICLR 2022).
 
-> **Authors:** Ruibo Liu, Chongyang Gao, Chenyan Jia, Guangxuan Xu, Soroush Vosoughi
+> Ruibo Liu, Chongyang Gao, Chenyan Jia, Guangxuan Xu, Soroush Vosoughi
+
+**TL;DR** -- Non-parallel text style transfer datasets contain *hidden parallelism*. LaMer mines roughly parallel sentence pairs using sentence embeddings and scene graphs, trains BART with MLE on the mined pairs, then refines with contrastive imitation learning. It outperforms eight baselines across sentiment, formality, and political stance transfer.
+
+---
 
 ## Overview
-
-LaMer is a self-supervised text style transfer (TST) framework built on large-scale language models. Unlike existing methods that randomly map source-to-target sentences, LaMer **mines roughly parallel expressions** hidden within non-parallel datasets, then uses these as self-supervision for training.
 
 ### Three-Step Pipeline
 
 ```
-Non-Parallel Data
-       |
-       v
-  ┌──────────────────────────────────────┐
-  │  Step 1: Mining Parallel Sentences   │
-  │                                      │
-  │  Random (RD) ─── baseline            │
-  │  Sentence Embedding (S-Emb.) ─── cosine similarity    │
-  │  S-Emb. + Scene Alignment Score (SAS) ─── best        │
-  └──────────────────────────────────────┘
-       |
-       v   Roughly parallel pairs (src → tgt)
-  ┌──────────────────────────────────────┐
-  │  Step 2: Conditional MLE Training    │
-  │                                      │
-  │  Fine-tune BART on mined pairs       │
-  │  Loss only on target tokens          │
-  └──────────────────────────────────────┘
-       |
-       v   Pre-trained BART model
-  ┌──────────────────────────────────────┐
-  │  Step 3: Imitation Learning (IL)     │
-  │                                      │
-  │  REINFORCE with contrastive loss     │
-  │  Expert (best pair) vs Amateur       │
-  │  d_SEM (semantic) + d_PSV (scene)    │
-  └──────────────────────────────────────┘
-       |
-       v
-  Final LaMer Model
+                       Non-Parallel Data
+                             |
+                             v
+               +-----------------------------+
+               |  Step 1: Mining Parallels   |
+               |                             |
+               |  Random         (baseline)  |
+               |  S-Emb.    (cosine sim.)    |
+               |  S-Emb.+SAS  (scene graph) |  <-- best
+               +-----------------------------+
+                             |
+                             v
+                   Mined parallel pairs
+                             |
+                             v
+               +-----------------------------+
+               |  Step 2: MLE on BART        |
+               |                             |
+               |  Conditional token-level    |
+               |  loss on target tokens only |
+               +-----------------------------+
+                             |
+                             v
+                   Pre-trained BART
+                             |
+                             v
+               +-----------------------------+
+               |  Step 3: Imitation Learning |
+               |                             |
+               |  REINFORCE + contrastive    |
+               |  expert vs amateur demos    |
+               +-----------------------------+
+                             |
+                             v
+                      Final LaMer Model
 ```
 
 ### Key Ideas
 
-- **Scene Alignment Score (SAS):** Extracts scene graphs from sentences and computes an F-beta score over shared entities to find content-preserving parallels
-- **Conditional MLE:** Uses BART to learn source→target generation from mined pairs
-- **Contrastive IL:** Further refines the model by contrasting expert demonstrations (best alignments) against amateur ones using REINFORCE
+- **Scene Alignment Score (SAS):** Extract scene graphs from sentences, compute F-beta over shared entities to find content-preserving parallels across styles
+- **Conditional MLE on BART:** Fine-tune a pre-trained text-to-text LM on the mined pairs, computing loss only on target tokens
+- **Contrastive Imitation Learning:** Refine the model with REINFORCE -- contrast the best alignment (expert) against weaker ones (amateur) using semantic coherence (d_SEM) and scene preservation (d_PSV) distances
+
+---
 
 ## Project Structure
 
 ```
 LaMer/
-├── LaMer/                      # Main package
-│   ├── data/                   # Step 1: Data alignment
-│   │   ├── config.py           # Task-specific hyperparameters
-│   │   ├── data_aligner.py     # DataAligner: Random, LM, LM+KG alignment
-│   │   ├── scene_graph.py      # Scene graph extraction & SAS computation
-│   │   └── utils.py            # Text normalization, batching utilities
-│   ├── model/                  # Steps 2 & 3: Training
-│   │   ├── bart_trainer.py     # BartStyleTransfer: MLE training & generation
-│   │   └── imitation_learning.py  # ImitationLearningTrainer: REINFORCE + contrastive
-│   └── evaluation/             # Evaluation metrics
-│       └── metrics.py          # ACC, BLEU, SIM, FL, i-PINC, GM
-├── scripts/                    # Runnable scripts
-│   ├── download_data.py        # Dataset download instructions
-│   ├── run_alignment.py        # Step 1: Mine parallel sentences
-│   ├── run_train.py            # Steps 2+3: MLE + IL training
-│   └── run_inference.py        # Generate style-transferred text
-├── test/                       # Unit tests
-├── setup.py                    # Package installation
+├── LaMer/                         # Main package
+│   ├── data/                      # Step 1: Data alignment
+│   │   ├── config.py              #   Task hyperparameters (k, p, beta)
+│   │   ├── data_aligner.py        #   DataAligner: Random / LM / LM+KG
+│   │   ├── scene_graph.py         #   Scene graph extraction + SAS
+│   │   └── utils.py               #   Text normalization, batching
+│   ├── model/                     # Steps 2--3: Training
+│   │   ├── bart_trainer.py        #   BartStyleTransfer: MLE + generation
+│   │   └── imitation_learning.py  #   REINFORCE with contrastive loss
+│   └── evaluation/                # Evaluation
+│       └── metrics.py             #   ACC, BLEU, SIM, FL, i-PINC, GM
+├── scripts/                       # Runnable end-to-end scripts
+│   ├── download_data.py           #   Dataset download instructions
+│   ├── run_alignment.py           #   Step 1
+│   ├── run_train.py               #   Steps 2 + 3
+│   └── run_inference.py           #   Generate style-transferred text
+├── test/                          # Unit tests
+├── setup.py
 └── README.md
 ```
 
+---
+
 ## Installation
 
-### Requirements
-
-- Python >= 3.8
-- PyTorch >= 1.9.0
-- CUDA (recommended for training)
-
-### Install
+**Requirements:** Python >= 3.8, PyTorch >= 1.9.0, CUDA recommended
 
 ```bash
-# Clone the repository
 git clone https://github.com/DapangLiu/LaMer.git
 cd LaMer
 
-# Install the package
+# Install with all dependencies
 pip install -e ".[dev]"
 
-# Install SceneGraphParser (for LM+KG alignment)
+# Scene graph parser (needed for LM+KG alignment)
 pip install SceneGraphParser
-
-# Download spaCy model (used by SceneGraphParser)
 python -m spacy download en_core_web_sm
 ```
 
+---
+
 ## Quick Start
 
-### 1. Prepare Data
+### Step 0: Prepare Data
 
 ```bash
-# See dataset download instructions
 python scripts/download_data.py --dataset yelp
 ```
 
-**Yelp Sentiment** (Shen et al., 2017): Download from [language-style-transfer](https://github.com/shentianxiao/language-style-transfer/tree/master/data/yelp) and place in `assets/yelp/raw/`.
+Each dataset has specific access requirements:
 
-**GYAFC Formality** (Rao & Tetreault, 2018): Request access from [GYAFC-corpus](https://github.com/raosudha89/GYAFC-corpus) and place in `data/GYAFC_Corpus/`.
+| Dataset | Source | Destination |
+|---------|--------|-------------|
+| **Yelp Sentiment** (Shen et al., 2017) | [language-style-transfer](https://github.com/shentianxiao/language-style-transfer/tree/master/data/yelp) | `assets/yelp/raw/` |
+| **GYAFC Formality** (Rao & Tetreault, 2018) | [GYAFC-corpus](https://github.com/raosudha89/GYAFC-corpus) (requires license) | `data/GYAFC_Corpus/` |
+| **AllSides Political Stance** | [allsides.com](https://www.allsides.com/story/admin) (see paper for extraction) | `data/allsides/` |
 
-**AllSides Political Stance**: See the paper for collection details.
-
-### 2. Mine Parallel Sentences (Step 1)
+### Step 1: Mine Parallel Sentences
 
 ```bash
-# Random baseline alignment
-python scripts/run_alignment.py --task yelp_pos2neg --method random
-
-# Sentence Embedding alignment
-python scripts/run_alignment.py --task yelp_pos2neg --method lm
-
-# S-Emb. + Scene Alignment Score (recommended)
+# Recommended: S-Emb. + Scene Alignment Score
 python scripts/run_alignment.py --task yelp_pos2neg --method lm_kg
+
+# Alternatives (for ablation)
+python scripts/run_alignment.py --task yelp_pos2neg --method lm       # S-Emb. only
+python scripts/run_alignment.py --task yelp_pos2neg --method random   # Random baseline
 ```
 
-Available tasks: `yelp_pos2neg`, `yelp_neg2pos`, `formal_music_f2i`, `formal_music_i2f`, `formal_family_f2i`, `formal_family_i2f`, `allsides_l2r`, `allsides_r2l`
+**Supported tasks:**
 
-### 3. Train the Model (Steps 2 + 3)
+| Task ID | Direction | Domain |
+|---------|-----------|--------|
+| `yelp_pos2neg` | Positive to Negative | Sentiment |
+| `yelp_neg2pos` | Negative to Positive | Sentiment |
+| `formal_music_f2i` | Formal to Informal | Formality (Music) |
+| `formal_music_i2f` | Informal to Formal | Formality (Music) |
+| `formal_family_f2i` | Formal to Informal | Formality (Family) |
+| `formal_family_i2f` | Informal to Formal | Formality (Family) |
+| `allsides_l2r` | Left to Right | Political Stance |
+| `allsides_r2l` | Right to Left | Political Stance |
+
+### Step 2 + 3: Train
 
 ```bash
-# MLE training only (Step 2)
+# MLE only (Step 2)
 python scripts/run_train.py \
-    --aligned_data yelp_lm_kg_tok50_top06_beta001/yelp_p2n_lm_kg_tok50_top06_beta001.csv \
+    --aligned_data <path-to-aligned-csv> \
     --output_dir checkpoints/yelp_p2n \
     --epochs 5 --batch_size 16 --lr 5e-5
 
-# MLE + Imitation Learning (Steps 2 + 3)
+# MLE + Imitation Learning (Steps 2 + 3, recommended)
 python scripts/run_train.py \
-    --aligned_data yelp_lm_kg_tok50_top06_beta001/yelp_p2n_lm_kg_tok50_top06_beta001.csv \
+    --aligned_data <path-to-aligned-csv> \
     --output_dir checkpoints/yelp_p2n \
     --epochs 5 --batch_size 16 --lr 5e-5 \
     --do_il --il_epochs 3 --alpha 0.4 --delta 0.5
 ```
 
-**Alpha values by task** (controls d_Order vs d_Exist in scene preservation):
-- Sentiment: `--alpha 0.4`
-- Formality: `--alpha 0.3`
-- Political Stance: `--alpha 0.1`
+> `<path-to-aligned-csv>` is the CSV produced by Step 1, e.g. `yelp_lm_kg_tok50_top06_beta001/yelp_p2n_lm_kg_tok50_top06_beta001.csv`
 
-### 4. Generate Style-Transferred Text
+**Alpha values** (controls d_Order vs d_Exist weight in scene preservation):
+
+| Domain | `--alpha` |
+|--------|-----------|
+| Sentiment | 0.4 |
+| Formality | 0.3 |
+| Political Stance | 0.1 |
+
+### Step 4: Generate
 
 ```bash
-# From file
+# From a file
 python scripts/run_inference.py \
     --model_path checkpoints/yelp_p2n/il/final \
-    --input_file test.src \
-    --output_file test.output
+    --input_file assets/yelp/raw/test.pos \
+    --output_file results/yelp_p2n.output
 
 # Single sentence
 python scripts/run_inference.py \
@@ -175,65 +194,109 @@ python scripts/run_inference.py \
     --interactive
 ```
 
-### 5. Evaluate
+### Step 5: Evaluate
 
 ```bash
 python -m LaMer.evaluation.metrics \
-    --source_file test.src \
-    --output_file test.output \
-    --reference_file test.ref \
+    --source_file assets/yelp/raw/test.pos \
+    --output_file results/yelp_p2n.output \
+    --reference_file assets/yelp/raw/reference.1 \
     --classifier_path checkpoints/style_classifier \
     --target_label 1
 ```
 
-Metrics reported:
-| Metric | Description |
-|--------|-------------|
-| **ACC** | Style transfer accuracy (via pre-trained classifier) |
-| **BLEU** | Average n-gram BLEU (1-4) against human references |
-| **SIM** | Sentence-level cosine similarity (content preservation) |
-| **FL** | GPT-2 perplexity (fluency; lower = better) |
-| **i-PINC** | Inverse paraphrase — net style change beyond copying |
-| **GM** | Geometric mean of ACC and BLEU |
+| Metric | What it measures | Notes |
+|--------|------------------|-------|
+| **ACC** | Style transfer accuracy | Requires a pre-trained style classifier |
+| **BLEU** | Content preservation | Average n-gram BLEU (n=1..4) against human references |
+| **SIM** | Semantic similarity | Cosine similarity between source and output embeddings |
+| **FL** | Fluency | GPT-2 perplexity (lower is better) |
+| **i-PINC** | Net style change | N-gram change beyond copying; penalizes identity copies |
+| **GM** | Overall quality | Geometric mean of ACC and BLEU |
 
-## Recommended Hyperparameters (Paper Table 1 / Figure 3)
+---
+
+## Reproducing Paper Results (Table 1)
+
+### Recommended Hyperparameters
+
+From paper Figure 3 -- the starred settings that best balance ACC and BLEU:
 
 | Task | Alignment k | Alignment p | SAS beta | IL alpha |
-|------|------------|------------|----------|----------|
+|------|:-----------:|:-----------:|:--------:|:--------:|
 | Sentiment (Yelp) | 200 | 0.6 | 0.01 | 0.4 |
 | Formality (GYAFC) | 500 | 0.4 | 0.01 | 0.3 |
 | Political Stance | 500 | 0.3 | 0.01 | 0.1 |
 
-## Reproducing Paper Results (Table 1)
+### Full Reproduction Script (Yelp Example)
 
 ```bash
-# Full pipeline for Yelp pos→neg
+# 1. Mine parallel pairs
 python scripts/run_alignment.py --task yelp_pos2neg --method lm_kg
+
+# 2. Train (MLE + IL)
 python scripts/run_train.py \
     --aligned_data yelp_lm_kg_tok50_top06_beta001/yelp_p2n_lm_kg_tok50_top06_beta001.csv \
     --output_dir checkpoints/yelp_p2n \
     --epochs 5 --do_il --il_epochs 3 --alpha 0.4
+
+# 3. Generate
 python scripts/run_inference.py \
     --model_path checkpoints/yelp_p2n/il/final \
     --input_file assets/yelp/raw/test.pos \
     --output_file results/yelp_p2n.output
+
+# 4. Evaluate
 python -m LaMer.evaluation.metrics \
     --source_file assets/yelp/raw/test.pos \
     --output_file results/yelp_p2n.output \
     --reference_file assets/yelp/raw/reference.1
 ```
 
+For formality or political stance, substitute the task ID, aligned data path, and alpha value from the tables above.
+
+### Expected Results (S-Emb. + SAS, from Table 1)
+
+| Task | ACC | BLEU | GM | i-PINC |
+|------|:---:|:----:|:--:|:------:|
+| Sentiment | 97.0 | 34.1 | 57.5 | 9.6 |
+| Formality | 76.5 | 39.2 | 54.8 | 13.3 |
+| Political Stance | 82.7 | 30.5 | 50.2 | 13.6 |
+
+---
+
+## Practical Notes
+
+- **GPU memory:** BART-base training requires ~8 GB VRAM with batch size 16. Reduce `--batch_size` if needed.
+- **Alignment speed:** LM+KG alignment with scene graph parsing is the slowest step. For quick experiments, start with `--method lm` or use `--num_samples 10000`.
+- **Style classifier for ACC:** The ACC metric requires a pre-trained style classifier. You can train a simple TextCNN or fine-tune BERT on the binary style labels from your training data. Without a classifier, ACC will report 0.
+- **SceneGraphParser:** If installation fails, LM-only alignment (`--method lm`) still works well (see paper Table 1, "w/ S-Emb." row).
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| `ModuleNotFoundError: sng_parser` | `pip install SceneGraphParser` |
+| `OSError: en_core_web_sm not found` | `python -m spacy download en_core_web_sm` |
+| CUDA out of memory during training | Reduce `--batch_size` (try 8 or 4) |
+| Empty alignment output | Check that data files exist at paths in `LaMer/data/config.py` |
+| `KeyError: pos_file_name` | Your task config may use different field names. Check `config.py` for the correct task ID. |
+
+---
+
 ## Citation
 
 ```bibtex
 @inproceedings{liu2022lamer,
-  title={Non-Parallel Text Style Transfer with Self-Parallel Supervision},
-  author={Liu, Ruibo and Gao, Chongyang and Jia, Chenyan and Xu, Guangxuan and Vosoughi, Soroush},
-  booktitle={International Conference on Learning Representations (ICLR)},
-  year={2022}
+  title     = {Non-Parallel Text Style Transfer with Self-Parallel Supervision},
+  author    = {Liu, Ruibo and Gao, Chongyang and Jia, Chenyan and Xu, Guangxuan and Vosoughi, Soroush},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2022}
 }
 ```
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+MIT. See [LICENSE](LICENSE) for details.
