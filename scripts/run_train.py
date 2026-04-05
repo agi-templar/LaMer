@@ -3,13 +3,13 @@
 
 Examples:
     # Step 2: MLE training only
-    python scripts/run_train.py \
+    uv run python scripts/run_train.py \
         --aligned_data yelp_lm_kg/aligned.csv \
         --output_dir checkpoints/yelp_p2n \
         --epochs 5
 
     # Step 2 + Step 3: MLE + Imitation Learning
-    python scripts/run_train.py \
+    uv run python scripts/run_train.py \
         --aligned_data yelp_lm_kg/aligned.csv \
         --output_dir checkpoints/yelp_p2n \
         --epochs 5 --do_il --il_epochs 3 --alpha 0.4

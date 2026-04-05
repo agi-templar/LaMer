@@ -83,7 +83,7 @@ LaMer/
 │   ├── run_train.py               #   Steps 2 + 3
 │   └── run_inference.py           #   Generate style-transferred text
 ├── test/                          # Unit tests
-├── setup.py
+├── pyproject.toml                 # Project config (uv / pip)
 └── README.md
 ```
 
@@ -91,18 +91,20 @@ LaMer/
 
 ## Installation
 
-**Requirements:** Python >= 3.8, PyTorch >= 1.9.0, CUDA recommended
+**Requirements:** Python >= 3.9, PyTorch >= 1.9.0, [uv](https://docs.astral.sh/uv/), CUDA recommended
 
 ```bash
 git clone https://github.com/DapangLiu/LaMer.git
 cd LaMer
 
-# Install with all dependencies
-pip install -e ".[dev]"
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Scene graph parser (needed for LM+KG alignment)
-pip install SceneGraphParser
-python -m spacy download en_core_web_sm
+# Install with all dependencies
+uv pip install -e ".[dev]"
+
+# Download spaCy model (used by SceneGraphParser)
+uv run python -m spacy download en_core_web_sm
 ```
 
 ---
@@ -112,7 +114,7 @@ python -m spacy download en_core_web_sm
 ### Step 0: Prepare Data
 
 ```bash
-python scripts/download_data.py --dataset yelp
+uv run python scripts/download_data.py --dataset yelp
 ```
 
 Each dataset has specific access requirements:
@@ -121,17 +123,17 @@ Each dataset has specific access requirements:
 |---------|--------|-------------|
 | **Yelp Sentiment** (Shen et al., 2017) | [language-style-transfer](https://github.com/shentianxiao/language-style-transfer/tree/master/data/yelp) | `assets/yelp/raw/` |
 | **GYAFC Formality** (Rao & Tetreault, 2018) | [GYAFC-corpus](https://github.com/raosudha89/GYAFC-corpus) (requires license) | `data/GYAFC_Corpus/` |
-| **AllSides Political Stance** | [allsides.com](https://www.allsides.com/story/admin) (see paper for extraction) | `data/allsides/` |
+| **AllSides Political Stance** | [allsides.com](https://www.allsides.com/unbiased-balanced-news) (see paper for extraction) | `data/allsides/` |
 
 ### Step 1: Mine Parallel Sentences
 
 ```bash
 # Recommended: S-Emb. + Scene Alignment Score
-python scripts/run_alignment.py --task yelp_pos2neg --method lm_kg
+uv run python scripts/run_alignment.py --task yelp_pos2neg --method lm_kg
 
 # Alternatives (for ablation)
-python scripts/run_alignment.py --task yelp_pos2neg --method lm       # S-Emb. only
-python scripts/run_alignment.py --task yelp_pos2neg --method random   # Random baseline
+uv run python scripts/run_alignment.py --task yelp_pos2neg --method lm       # S-Emb. only
+uv run python scripts/run_alignment.py --task yelp_pos2neg --method random   # Random baseline
 ```
 
 **Supported tasks:**
@@ -151,13 +153,13 @@ python scripts/run_alignment.py --task yelp_pos2neg --method random   # Random b
 
 ```bash
 # MLE only (Step 2)
-python scripts/run_train.py \
+uv run python scripts/run_train.py \
     --aligned_data <path-to-aligned-csv> \
     --output_dir checkpoints/yelp_p2n \
     --epochs 5 --batch_size 16 --lr 5e-5
 
 # MLE + Imitation Learning (Steps 2 + 3, recommended)
-python scripts/run_train.py \
+uv run python scripts/run_train.py \
     --aligned_data <path-to-aligned-csv> \
     --output_dir checkpoints/yelp_p2n \
     --epochs 5 --batch_size 16 --lr 5e-5 \
@@ -178,18 +180,18 @@ python scripts/run_train.py \
 
 ```bash
 # From a file
-python scripts/run_inference.py \
+uv run python scripts/run_inference.py \
     --model_path checkpoints/yelp_p2n/il/final \
     --input_file assets/yelp/raw/test.pos \
     --output_file results/yelp_p2n.output
 
 # Single sentence
-python scripts/run_inference.py \
+uv run python scripts/run_inference.py \
     --model_path checkpoints/yelp_p2n/il/final \
     --text "the food was really great and i loved it"
 
 # Interactive mode
-python scripts/run_inference.py \
+uv run python scripts/run_inference.py \
     --model_path checkpoints/yelp_p2n/il/final \
     --interactive
 ```
@@ -197,7 +199,7 @@ python scripts/run_inference.py \
 ### Step 5: Evaluate
 
 ```bash
-python -m LaMer.evaluation.metrics \
+uv run python -m LaMer.evaluation.metrics \
     --source_file assets/yelp/raw/test.pos \
     --output_file results/yelp_p2n.output \
     --reference_file assets/yelp/raw/reference.1 \
@@ -232,22 +234,22 @@ From paper Figure 3 -- the starred settings that best balance ACC and BLEU:
 
 ```bash
 # 1. Mine parallel pairs
-python scripts/run_alignment.py --task yelp_pos2neg --method lm_kg
+uv run python scripts/run_alignment.py --task yelp_pos2neg --method lm_kg
 
 # 2. Train (MLE + IL)
-python scripts/run_train.py \
+uv run python scripts/run_train.py \
     --aligned_data yelp_lm_kg_tok50_top06_beta001/yelp_p2n_lm_kg_tok50_top06_beta001.csv \
     --output_dir checkpoints/yelp_p2n \
     --epochs 5 --do_il --il_epochs 3 --alpha 0.4
 
 # 3. Generate
-python scripts/run_inference.py \
+uv run python scripts/run_inference.py \
     --model_path checkpoints/yelp_p2n/il/final \
     --input_file assets/yelp/raw/test.pos \
     --output_file results/yelp_p2n.output
 
 # 4. Evaluate
-python -m LaMer.evaluation.metrics \
+uv run python -m LaMer.evaluation.metrics \
     --source_file assets/yelp/raw/test.pos \
     --output_file results/yelp_p2n.output \
     --reference_file assets/yelp/raw/reference.1
@@ -278,8 +280,8 @@ For formality or political stance, substitute the task ID, aligned data path, an
 
 | Problem | Solution |
 |---------|----------|
-| `ModuleNotFoundError: sng_parser` | `pip install SceneGraphParser` |
-| `OSError: en_core_web_sm not found` | `python -m spacy download en_core_web_sm` |
+| `ModuleNotFoundError: sng_parser` | `uv pip install SceneGraphParser` |
+| `OSError: en_core_web_sm not found` | `uv run python -m spacy download en_core_web_sm` |
 | CUDA out of memory during training | Reduce `--batch_size` (try 8 or 4) |
 | Empty alignment output | Check that data files exist at paths in `LaMer/data/config.py` |
 | `KeyError: pos_file_name` | Your task config may use different field names. Check `config.py` for the correct task ID. |

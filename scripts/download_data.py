@@ -2,9 +2,9 @@
 """Download datasets for LaMer experiments.
 
 Examples:
-    python scripts/download_data.py --dataset yelp
-    python scripts/download_data.py --dataset gyafc
-    python scripts/download_data.py --dataset all
+    uv run python scripts/download_data.py --dataset yelp
+    uv run python scripts/download_data.py --dataset gyafc
+    uv run python scripts/download_data.py --dataset all
 """
 
 import argparse
@@ -69,7 +69,7 @@ def download_allsides(data_dir: str = 'data/allsides') -> None:
     os.makedirs(data_dir, exist_ok=True)
 
     print("AllSides Political Stance Dataset")
-    print("Source: https://www.allsides.com/story/admin")
+    print("Source: https://www.allsides.com/unbiased-balanced-news")
     print()
     print("The paper provides links to articles (not raw text) due to TOS.")
     print("Please check the official LaMer repo for the extraction code:")

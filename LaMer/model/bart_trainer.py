@@ -10,7 +10,7 @@ target-style parallel sentences found in the mining step. We use BART
 (Lewis et al., 2020) as the text-to-text LM backbone.
 
 Usage example:
-    python -m LaMer.model.bart_trainer \
+    uv run python -m LaMer.model.bart_trainer \
         --aligned_data assets/yelp/yelp_lm_kg/aligned.csv \
         --output_dir checkpoints/yelp_p2n \
         --epochs 5 --batch_size 16 --lr 5e-5

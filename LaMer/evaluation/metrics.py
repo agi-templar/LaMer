@@ -6,7 +6,7 @@
 """TST metrics: ACC, BLEU, SIM, FL, i-PINC, GM (Section 3.2).
 
 Usage:
-    python -m LaMer.evaluation.metrics \
+    uv run python -m LaMer.evaluation.metrics \
         --source_file test.src \
         --output_file test.output \
         --reference_file test.ref \

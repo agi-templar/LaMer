@@ -10,7 +10,7 @@ contrastive loss. The expert demonstration (highest SAS/similarity) is
 contrasted against amateur demonstrations.
 
 Usage:
-    python -m LaMer.model.imitation_learning \
+    uv run python -m LaMer.model.imitation_learning \
         --mle_checkpoint checkpoints/yelp_p2n/final \
         --aligned_data assets/yelp/yelp_lm_kg/aligned.csv \
         --output_dir checkpoints/yelp_p2n_il \

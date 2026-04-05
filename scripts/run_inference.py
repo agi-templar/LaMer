@@ -3,18 +3,18 @@
 
 Examples:
     # Generate from a file
-    python scripts/run_inference.py \
+    uv run python scripts/run_inference.py \
         --model_path checkpoints/yelp_p2n/il/final \
         --input_file test.src \
         --output_file test.output
 
     # Interactive mode
-    python scripts/run_inference.py \
+    uv run python scripts/run_inference.py \
         --model_path checkpoints/yelp_p2n/il/final \
         --interactive
 
     # Single sentence
-    python scripts/run_inference.py \
+    uv run python scripts/run_inference.py \
         --model_path checkpoints/yelp_p2n/il/final \
         --text "the food was really great and i loved it"
 """

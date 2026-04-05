@@ -3,13 +3,13 @@
 
 Examples:
     # Random alignment
-    python scripts/run_alignment.py --task yelp_pos2neg --method random
+    uv run python scripts/run_alignment.py --task yelp_pos2neg --method random
 
     # LM (Sentence Embedding) alignment
-    python scripts/run_alignment.py --task yelp_pos2neg --method lm
+    uv run python scripts/run_alignment.py --task yelp_pos2neg --method lm
 
     # LM + KG (Scene Graph) alignment
-    python scripts/run_alignment.py --task yelp_pos2neg --method lm_kg
+    uv run python scripts/run_alignment.py --task yelp_pos2neg --method lm_kg
 """
 
 import argparse
